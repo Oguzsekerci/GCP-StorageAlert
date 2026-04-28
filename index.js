@@ -1,71 +1,72 @@
 const moment = require('moment-timezone');
 const request = require('request');
-const {Storage} = require('@google-cloud/storage');
+const { Storage } = require('@google-cloud/storage');
 
-const reqURL = ``;
+// Set your Slack incoming webhook URL here
+const reqURL = `YOUR_SLACK_WEBHOOK_URL`;
 
 const storage = new Storage();
 
 exports.cloudstoragealert = (event, context) => {
-  var timezone = "Asia/Istanbul";
-  var objectType ="Upload";
-  var objectKey = event.name;
-  var objectSize = Number((event.size / 1024).toFixed(2));
-  var objectUnit = "KB";
+  const timezone = 'Asia/Istanbul';
+  const objectKey = event.name;
+  const bucket = event.bucket;
+  const eventTime = moment.tz(event.timeCreated, timezone).format('DD/MM/YYYY HH:mm:ss');
 
-  if(objectSize > 1024) {
+  let objectSize = Number((event.size / 1024).toFixed(2));
+  let objectUnit = 'KB';
+
+  if (objectSize > 1024) {
     objectSize = Number((objectSize / 1024).toFixed(2));
-    objectUnit = "MB";
+    objectUnit = 'MB';
   }
 
-  var eventTime = moment.tz(event.timeCreated, timezone).format("DD/MM/YYYY HH:mm:ss");
-  var bucket = event.bucket;
-  var attachmentTitle = `New upload :oguzhey:`;
-  var messageTitle = `${objectType} to bucket - ${bucket}`;
-  var messageLevel = "good";
-  var filedValueContext = objectKey + " has been uploaded to bucket successfully on " + eventTime + "\n file size: " + objectSize + " " + objectUnit+"\n Link is here: " + `https://console.cloud.google.com/storage/browser/_details/${bucket}/${objectKey}`;
-
-  var actions = event.eventType;
-
-  if(actions === 'OBJECT_FINALIZE'){
-    messageTitle = `${objectType} at bucket ${bucket}`;
-    messageLevel = "good";
-    filedValueContext = objectKey + " has been uploaded to bucket successfully on " + eventTime + "\n file size: " + objectSize + " " + objectUnit + "\n Link is here: " + `https://console.cloud.google.com/storage/browser/${bucket}/${objectKey}`;
+  if (event.eventType !== 'OBJECT_FINALIZE') {
+    console.log(`Skipped event type: ${event.eventType}`);
+    return;
   }
 
-  var attachments = {
-    "attachments":[
+  const consoleLink = `https://console.cloud.google.com/storage/browser/${bucket}/${objectKey}`;
+  const messageTitle = `Upload at bucket ${bucket}`;
+  const fieldValue =
+    `${objectKey} has been uploaded to bucket successfully on ${eventTime}\n` +
+    `File size: ${objectSize} ${objectUnit}\n` +
+    `Link: ${consoleLink}`;
+
+  const attachments = {
+    attachments: [
       {
-        "fallback": attachmentTitle,
-        "pretext": attachmentTitle,
-        "color": messageLevel,
-        "fields":[
+        fallback: `New upload to ${bucket}`,
+        pretext: `New upload to ${bucket}`,
+        color: 'good',
+        fields: [
           {
-            "title": messageTitle,
-            "value": filedValueContext,
-            "short": false
-          }
-        ]
-      }
-    ]
+            title: messageTitle,
+            value: fieldValue,
+            short: false,
+          },
+        ],
+      },
+    ],
   };
 
-  var options = {
+  const options = {
     uri: reqURL,
     method: 'POST',
-    json: attachments
+    json: attachments,
   };
 
-  request.post(options, function (error, response, body) {
-    if (!error && response.statusCode == 200) {
-      console.log(body.id) // Print the shortened url.
-      console.log("body: " + body);
-      console.log("Post to slack error: " + error)
+  request.post(options, (error, response, body) => {
+    if (error) {
+      console.error('Slack request failed:', error);
+      return;
     }
+    if (response.statusCode !== 200) {
+      console.error('Slack returned non-200:', response.statusCode, body);
+      return;
+    }
+    console.log('Slack notification sent:', body);
   });
 
-  console.log(event);
-  console.log(event);
-
-  return messageTitle + ' Object Key:' + objectKey;
+  return `${messageTitle} | Object: ${objectKey}`;
 };
