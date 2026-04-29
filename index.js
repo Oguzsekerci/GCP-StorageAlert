@@ -1,10 +1,9 @@
+const axios = require('axios');
 const moment = require('moment-timezone');
-const request = require('request');
 
-// Set your Slack incoming webhook URL here
-const reqURL = `YOUR_SLACK_WEBHOOK_URL`;
+const reqURL = process.env.SLACK_WEBHOOK_URL;
 
-exports.cloudstoragealert = (event, context) => {
+exports.cloudstoragealert = async (event, context) => {
   const timezone = 'Asia/Istanbul';
   const objectKey = event.name;
   const bucket = event.bucket;
@@ -25,40 +24,17 @@ exports.cloudstoragealert = (event, context) => {
     `File size: ${objectSize} ${objectUnit}\n` +
     `Link: ${consoleLink}`;
 
-  const attachments = {
+  const payload = {
     attachments: [
       {
         fallback: `New upload to ${bucket}`,
         pretext: `New upload to ${bucket}`,
         color: 'good',
-        fields: [
-          {
-            title: messageTitle,
-            value: fieldValue,
-            short: false,
-          },
-        ],
+        fields: [{ title: messageTitle, value: fieldValue, short: false }],
       },
     ],
   };
 
-  const options = {
-    uri: reqURL,
-    method: 'POST',
-    json: attachments,
-  };
-
-  request.post(options, (error, response, body) => {
-    if (error) {
-      console.error('Slack request failed:', error);
-      return;
-    }
-    if (response.statusCode !== 200) {
-      console.error('Slack returned non-200:', response.statusCode, body);
-      return;
-    }
-    console.log('Slack notification sent:', body);
-  });
-
+  await axios.post(reqURL, payload);
   return `${messageTitle} | Object: ${objectKey}`;
 };
