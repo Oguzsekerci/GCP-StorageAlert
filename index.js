@@ -1,11 +1,8 @@
 const moment = require('moment-timezone');
 const request = require('request');
-const { Storage } = require('@google-cloud/storage');
 
 // Set your Slack incoming webhook URL here
 const reqURL = `YOUR_SLACK_WEBHOOK_URL`;
-
-const storage = new Storage();
 
 exports.cloudstoragealert = (event, context) => {
   const timezone = 'Asia/Istanbul';
@@ -19,11 +16,6 @@ exports.cloudstoragealert = (event, context) => {
   if (objectSize > 1024) {
     objectSize = Number((objectSize / 1024).toFixed(2));
     objectUnit = 'MB';
-  }
-
-  if (event.eventType !== 'OBJECT_FINALIZE') {
-    console.log(`Skipped event type: ${event.eventType}`);
-    return;
   }
 
   const consoleLink = `https://console.cloud.google.com/storage/browser/${bucket}/${objectKey}`;
